@@ -1,0 +1,9 @@
+agtp
+old
+*.dat
+CMakeFiles
+*.txt
+*.cmake
+*.log
+Makefile
+!CMakeLists.txt
