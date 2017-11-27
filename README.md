@@ -16,8 +16,8 @@ For help run:
 The program is interactive, so just follow instructions.
 An [example](sample/sample.png) of what the program produces. 
 
-The area files may be plotted with gnuplot:
+The generated area files may be plotted with gnuplot:
 ```
 plot "time_area1.dat" binary format='%uint32' using ($0/125000000):1 with lines notitle
 ```
-An [example](area1-time/sample.png). From this the state lifetime can be determined of the peak markes as Area1.
+An [example](sample/area1-time.png). From this the state lifetime can be determined of the peak markes as Area1.
