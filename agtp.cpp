@@ -30,6 +30,7 @@ unsigned alpha_Nmes,gamma_Nmes; 	//the total number of measurements per file (al
 unsigned time_len;
 unsigned alpha_Nch,gamma_Nch;		//the total number of measurements (time.dat) will be [alpha_Nch]x[gamma_Nch]x[time_len]
 unsigned step_alpha,step_gamma;
+unsigned alpha_maxN, gamma_maxN;
 unsigned alpha_max=0;
 unsigned gamma_max=0;
 		
@@ -39,7 +40,9 @@ void _help()
 	        "<path>: path to folder containing measurements\n"
 	        "<mode>: 0 - integration on time resolved\n"
 	        "        1 - integration on time resolved minus background\n"
-	        "        2 - peak - background ratio\n");
+	        "        2 - peak - background ratio\n"
+	        "        3 - integration on time resolved minus background (background calculated using total num of events)\n"
+	        "        4 - peak - background ratio (background calculated using total num of events)\n");
 }
 
 double xmax,xmin,ymax,ymin,xstep,ystep;
@@ -110,12 +113,28 @@ void _load_conf(string fpath)
 			sscanf(conffile.substr(pos_interval).c_str(), "%lf", &interval);
 		}else {printf("Error in interval. Delete file to regenerate from template.\n"); exit(0);}
 	time_len=(unsigned)(interval*125000000);
-		
-	if (!alpha_edge) alpha_Nmes = 8191-alpha_thresh+1;
-	else alpha_Nmes = -(-8192-alpha_thresh)+1;
+	size_t pos_alpha_max = conffile.find("alpha_max(R edge: alpha_thresh < x < 8191, F edge: -8192 < x < alpha_thresh):");
+		if (pos_alpha_max != string::npos){
+			pos_alpha_max+=77;
+			sscanf(conffile.substr(pos_alpha_max).c_str(), "%d", &alpha_maxN);
+		}
+		else if(!alpha_edge)	//we dont error on this for backwards compatibility
+			alpha_maxN = 8191;
+		else alpha_maxN = -8192;
+	size_t pos_gamma_max = conffile.find("gamma_max(R edge: gamma_thresh < x < 8191, F edge: -8192 < x < gamma_thresh):");
+		if (pos_gamma_max != string::npos){
+			pos_gamma_max+=77;
+			sscanf(conffile.substr(pos_gamma_max).c_str(), "%d", &gamma_maxN);
+		}
+		else if(!gamma_edge)	//we dont error on this for backwards compatibility
+			gamma_maxN = 8191;
+		else gamma_maxN = -8192;
+	
+	if (!alpha_edge) alpha_Nmes = alpha_maxN-alpha_thresh+1;
+	else alpha_Nmes = -(alpha_maxN-alpha_thresh)+1;
 	alpha_Nch = alpha_Nmes/step_alpha+1;
-	if (!gamma_edge) gamma_Nmes = 8191-gamma_thresh+1;
-	else gamma_Nmes = -(-8192-gamma_thresh)+1;
+	if (!gamma_edge) gamma_Nmes = gamma_maxN-gamma_thresh+1;
+	else gamma_Nmes = -(gamma_maxN-gamma_thresh)+1;
 	gamma_Nch = gamma_Nmes/step_gamma+1;
 	printf("alpha_Nmes=%u\n",alpha_Nmes);
 	printf("gamma_Nmes=%u\n",gamma_Nmes);
@@ -135,6 +154,7 @@ FILE *Fgplot;
 void _gnuplot_set(int stage, int mode)
 {
 	double amax;
+	if(mode>2) mode-=2;
 	int N=0;
 	switch (stage){
 	case 0: Fgplot = popen("gnuplot -persistent", "w"); //we want to see error messages
@@ -235,14 +255,15 @@ void _gnuplot_set(int stage, int mode)
 					"set pm3d map\n"
 					"unset colorbox\n"
 	    				"unset dgrid3d\n"
-	    				"unset style fill\n",xmin,xmax,ymin,ymax,(mode==2)?'*':'0',(int)(xstep/step_alpha),(int)(ystep/step_gamma));    
+	    				"unset style fill\n"
+	    				"set style rectangle back fill border lc rgb \"black\"\n"
+					"set object rectangle from screen 0.26,screen 0 to screen 1,screen 0.74 fill transparent solid 1 fc rgb \"black\" behind\n"
+					,xmin,xmax,ymin,ymax,(mode==2)?'*':'0',(int)(xstep/step_alpha),(int)(ystep/step_gamma));    
 	    		if (mode==0 || mode==1) 
 	    			fprintf ( Fgplot,"A=1.7\n"
 					"set palette model XYZ functions gray**(A*0.35), gray**(A*0.5), gray**(A*0.8)\n");
 			else if (mode==2)
-				fprintf ( Fgplot,"set style rectangle back fill border lc rgb \"black\"\n"
-					"set object rectangle from screen 0.26,screen 0 to screen 1,screen 0.74 fill transparent solid 1 fc rgb \"black\" behind\n"
-					"set palette maxcolors 100\n"
+				fprintf ( Fgplot,"set palette maxcolors 100\n"
 					"set palette defined (0 \"blue\", 99 \"yellow\")\n");
 	    	break;
 	case -1:string com;
@@ -268,7 +289,8 @@ void _gnuplot_set(int stage, int mode)
 	fflush(Fgplot);
 }
 
-double _integrate(unsigned *time_array, int mode)
+double minnum=100;
+double _integrate(unsigned *time_array, int mode, double dbkgnd)
 {
 	long int result=0;
 	long int bkgnd=0;
@@ -282,18 +304,31 @@ double _integrate(unsigned *time_array, int mode)
 	for (unsigned i=0;i!=time_len;i++)   
 	        result+=time_array[i];
 	        
-	if (mode==0 || mode==1) return (double)(result-bkgnd);
-	else if (mode==2){
-		if ((result-bkgnd)>=100) return ((double)(result-bkgnd)/bkgnd);
-		else return NAN;
+	if (mode<3){
+		if (mode==0 || mode==1) return (double)(result-bkgnd);
+		else if (mode==2){
+			if ((result-bkgnd)>=minnum) return ((double)(result-bkgnd)/bkgnd);
+			else return NAN;
+		}
 	}
+	else{
+		result=0;
+		for (unsigned i=time_len/4;i!=3*time_len/4;i++)   
+			result+=time_array[i];
+		if (mode==3) return (double)(result-dbkgnd);
+		else if (mode==4){
+			if ((result-dbkgnd)>=minnum) return ((double)(result-dbkgnd)/dbkgnd);
+			else return NAN;
+		}
+	}
+		
 }
 
 int main(int argc,char *argv[])
 {
 	if (argc!=3){_help();return 0;}
 	int mode = atoi(argv[2]);
-	if ((mode<0)||(mode>3)){_help();return 0;}
+	if ((mode<0)||(mode>4)){_help();return 0;}
 	string fpath = argv[1];
 	if (fpath.back()=='/') fpath.resize(fpath.size()-1);
 	FILE *Falpha,*Fgamma,*Ftime,*Fconf;
@@ -314,8 +349,33 @@ int main(int argc,char *argv[])
 	for (unsigned i=0;i!=gamma_Nmes-1*step_gamma;i++) if (gamma_max<gamma_array[i]) gamma_max=gamma_array[i];
 	fclose(Fgamma);
 	
+	long long unsigned alpha_tot=0;
+	unsigned *alpha_array_sh = new unsigned[alpha_Nch];
+	for (unsigned i=0;i!=alpha_Nch;i++) alpha_array_sh[i]=0;
+	for (unsigned i=0;i!=alpha_Nmes;i++) {
+		alpha_array_sh[(int)(i/step_alpha)]+=alpha_array[i];
+		alpha_tot+=alpha_array[i];
+	}
+	long long unsigned gamma_tot=0;
+	unsigned *gamma_array_sh = new unsigned[gamma_Nch];
+	for (unsigned i=0;i!=gamma_Nch;i++) gamma_array_sh[i]=0;
+	for (unsigned i=0;i!=gamma_Nmes;i++) {
+		gamma_array_sh[(int)(i/step_gamma)]+=gamma_array[i];
+		gamma_tot+=gamma_array[i];
+	}
+	long long unsigned bkgnd_tot=0;
+	unsigned *time_array = new unsigned[time_len];
+	for (unsigned i=0;i!=alpha_Nch;i++){
+		for (unsigned j=0;j!=gamma_Nch;j++){
+			fread (time_array,sizeof(unsigned),time_len,Ftime);
+			for (unsigned k=0;k!=time_len/4;k++)          bkgnd_tot+=time_array[k];
+			for (unsigned k=3*time_len/4;k!=time_len;k++) bkgnd_tot+=time_array[k]; 
+		}
+	}
+	fseek (Ftime, 0,SEEK_SET);
 	
 	bool done=false;
+	bool done2=false;
 	_gnuplot_set(0,mode);
 plotgt:	_gnuplot_set(1,mode);
 	fprintf ( Fgplot, "plot \"-\" using 1:2 with filledcurves below x lc rgb \"#19afe0\" title \"alpha\", \"-\" using 1:2 w l lc rgb \"#19afe0\" notitle\n");
@@ -340,11 +400,10 @@ plotgt:	_gnuplot_set(1,mode);
 	_gnuplot_set(-2,mode);
 	fprintf ( Fgplot, "splot \"-\" using 1:2:3 with pm3d notitle\n");
 	double sum;
-	unsigned *time_array = new unsigned[time_len];
 	for (unsigned i=0;i!=alpha_Nch;i++){
 		for (unsigned j=0;j!=gamma_Nch;j++){
 			fread (time_array,sizeof(unsigned),time_len,Ftime);
-			sum = _integrate(time_array, mode);
+			sum = _integrate(time_array, mode, (double)bkgnd_tot/alpha_tot*alpha_array_sh[i]/gamma_tot*gamma_array_sh[j]);
 			if (sum<0) sum=0;
 			if (j<=gamma_Nch-1 && i<=alpha_Nch-1) fprintf(Fgplot,"%lf %lf %lf\n",(double)i+0.5,(double)j+0.5,sum);
 		}
@@ -388,45 +447,68 @@ plotgt:	_gnuplot_set(1,mode);
 		goto plotgt;
 	}
 	
-	unsigned *exptime_array = new unsigned[time_len];
-	printf ( "\n\nSet peaks by providing boundaries. Use format: amin amax gmin gmax and hit enter. To end hit enter again.\n");
-	for (int i=1;;i++){
-		char newvalstr[100]; double amin,amax,gmin,gmax;
-		printf ( "Peak%d:\n",i);
-		fgets (newvalstr , 100 , stdin);
-		if (sscanf(newvalstr,"%lf%lf%lf%lf",&amin,&amax,&gmin,&gmax)!=4) break;
-		fprintf ( Fgplot,	"set label \"peak%d\" at %lf,%lf textcolor \"white\" front\n"
-					"set arrow from %lf,%lf to %lf,%lf nohead dt 3 lc \"white\" front\n"
-					"set arrow from %lf,%lf to %lf,%lf nohead dt 3 lc \"white\" front\n"
-					"set arrow from %lf,%lf to %lf,%lf nohead dt 3 lc \"white\" front\n"
-					"set arrow from %lf,%lf to %lf,%lf nohead dt 3 lc \"white\" front\n"
-					"replot\n"
-					,i,amin,gmax+(ymax-ymin)/35,
-					amin,gmin,amax,gmin,
-					amax,gmin,amax,gmax,
-					amax,gmax,amin,gmax,
-					amin,gmax,amin,gmin);
-		amin-=0.5;amax-=0.5;gmin-=0.5;gmax-=0.5;	
-		fflush(Fgplot);	
-		
-		fseek (Ftime, 0,SEEK_SET);
-		for (unsigned i=0;i!=time_len;i++) exptime_array[i]=0;
-		for (unsigned i=0;i!=alpha_Nch;i++){
-			for (unsigned j=0;j!=gamma_Nch;j++){
-				fread (time_array,sizeof(unsigned),time_len,Ftime);
-				if ((i>=amin)&&(i<=amax)&&(j>=gmin)&&(j<=gmax))
-					for (unsigned k=0;k!=time_len;k++) 
-						exptime_array[k]+=time_array[k];
-			}
+	
+	
+	if (mode==2 || mode==4){
+		if (!done2) {
+			printf ( "\n\nEnter threshold and tics step and hit enter, repeat until satisfied . To end hit enter again.\n");
+			done2=true;
 		}
-		FILE *Ftimesum;
-		string fname="time_peak"+to_string(i)+".dat";
-		Ftimesum = fopen(fname.c_str(),"wb");
-		fwrite (exptime_array,sizeof(unsigned),time_len,Ftimesum);
-		fclose(Ftimesum);
-		
-		printf ( "Time graph exported to file %s\n",fname.c_str());
+		char newvalstr[100]; double cbtics;
+		fgets (newvalstr , 100 , stdin);
+		if (sscanf(newvalstr,"%lf%lf",&minnum,&cbtics)==2){
+			fseek (Ftime, 0,SEEK_SET);
+			fprintf ( Fgplot,"reset\nclear\n");
+			fprintf ( Fgplot,"set cbtics %lf\n",cbtics);
+			fflush(Fgplot);
+			goto plotgt;
+		}
 	}
+	else{
+		unsigned *exptime_array = new unsigned[time_len];
+		printf ( "\n\nSet areas by providing boundaries. Use format: amin amax gmin gmax and hit enter. To end hit enter again.\n");
+		for (int i=1;;i++){
+			char newvalstr[100]; double amin,amax,gmin,gmax;
+			printf ( "Area%d:\n",i);
+			fgets (newvalstr , 100 , stdin);
+			if (sscanf(newvalstr,"%lf%lf%lf%lf",&amin,&amax,&gmin,&gmax)!=4) break;
+			fprintf ( Fgplot,	"set label \"Area%d\" at %lf,%lf textcolor \"white\" front\n"
+						"set arrow from %lf,%lf to %lf,%lf nohead dt 3 lc \"white\" front\n"
+						"set arrow from %lf,%lf to %lf,%lf nohead dt 3 lc \"white\" front\n"
+						"set arrow from %lf,%lf to %lf,%lf nohead dt 3 lc \"white\" front\n"
+						"set arrow from %lf,%lf to %lf,%lf nohead dt 3 lc \"white\" front\n"
+						"replot\n"
+						,i,amin,gmax+(ymax-ymin)/35,
+						amin,gmin,amax,gmin,
+						amax,gmin,amax,gmax,
+						amax,gmax,amin,gmax,
+						amin,gmax,amin,gmin);
+			amin-=0.5;amax-=0.5;gmin-=0.5;gmax-=0.5;	
+			fflush(Fgplot);	
+			
+			fseek (Ftime, 0,SEEK_SET);
+			long long unsigned total=0;
+			for (unsigned i=0;i!=time_len;i++) exptime_array[i]=0;
+			for (unsigned i=0;i!=alpha_Nch;i++){
+				for (unsigned j=0;j!=gamma_Nch;j++){
+					fread (time_array,sizeof(unsigned),time_len,Ftime);
+					if ((i>=amin)&&(i<=amax)&&(j>=gmin)&&(j<=gmax))
+						for (unsigned k=0;k!=time_len;k++) {
+							exptime_array[k]+=time_array[k];
+							total+=time_array[k];
+						}
+				}
+			}
+			FILE *Ftimesum;
+			string fname="time_area"+to_string(i)+".dat";
+			Ftimesum = fopen(fname.c_str(),"wb");
+			fwrite (exptime_array,sizeof(unsigned),time_len,Ftimesum);
+			fclose(Ftimesum);
+			printf ( "Total number of counts in area: %llu\n",total);
+			printf ( "Time graph exported to file %s\n",fname.c_str());
+		}
+	}
+		
 	
 	
 	fclose(Ftime);
