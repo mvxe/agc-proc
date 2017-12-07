@@ -142,6 +142,8 @@ void _load_conf(string fpath)
 	printf("gamma_Nch=%u\n",gamma_Nch);
 	printf("time_len=%u\n",time_len);
 	
+	if (conffile.find("Observed interval before and after trigger event(0 - 34.3597)(in seconds):") != string::npos) time_len*=2;	//backward(forward) compatibility
+	
 	xmin=0;
 	xmax=alpha_Nch-1;
 	ymin=0;
