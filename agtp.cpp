@@ -547,14 +547,14 @@ plotgt:	_gnuplot_set(1,mode);
 			
 			fname="alpha_area"+to_string(i)+".txt";
 			Ftimesum = fopen(fname.c_str(),"w");
-			for (int j=1;j<amax-amin+1;j++) fprintf(Ftimesum,"%lf %lf\n",(amin+j+0.5)*step_alpha,expalpha_array[j]);
+			for (int j=1;j<amax-amin+1;j++) fprintf(Ftimesum,"%lf %lf\n",(amin+j)*step_alpha,expalpha_array[j]);
 			fclose(Ftimesum);
 			printf ( "Alpha graph exported to file %s\n Format is: Channel CountN\n",fname.c_str());
 			delete[] expalpha_array;
 			
 			fname="gamma_area"+to_string(i)+".txt";
 			Ftimesum = fopen(fname.c_str(),"w");
-			for (int j=1;j<gmax-gmin+1;j++) fprintf(Ftimesum,"%lf %lf\n",(gmin+j+0.5)*step_gamma,expgamma_array[j]);
+			for (int j=1;j<gmax-gmin+1;j++) fprintf(Ftimesum,"%lf %lf\n",(gmin+j)*step_gamma,expgamma_array[j]);
 			fclose(Ftimesum);
 			printf ( "Gamma graph exported to file %s\n Format is: Channel CountN\n",fname.c_str());
 			delete[] expgamma_array;
