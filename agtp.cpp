@@ -481,7 +481,7 @@ plotgt:	_gnuplot_set(1,mode);
 						"set arrow from %lf,%lf to %lf,%lf nohead dt 3 lc \"white\" front\n"
 						"set arrow from %lf,%lf to %lf,%lf nohead dt 3 lc \"white\" front\n"
 						"replot\n"
-						,i,amin,gmax+(ymax-ymin)/35,
+						,i,amax+(xmax-xmin)/100,gmax-(ymax-ymin)/40,
 						amin,gmin,amax,gmin,
 						amax,gmin,amax,gmax,
 						amax,gmax,amin,gmax,
@@ -490,9 +490,9 @@ plotgt:	_gnuplot_set(1,mode);
 			fflush(Fgplot);	
 			
 			double *expalpha_array = new double[(int)(amax-amin+2)];
-			for (int j=0;j!=amax-amin+1;j++) expalpha_array[j]=0;
+			for (int j=0;j<amax-amin+1;j++) expalpha_array[j]=0;
 			double *expgamma_array = new double[(int)(gmax-gmin+2)];
-			for (int j=0;j!=gmax-gmin+1;j++) expgamma_array[j]=0;
+			for (int j=0;j<gmax-gmin+1;j++) expgamma_array[j]=0;
 			double sum;
 			
 			double *expalpha_array_bk;
