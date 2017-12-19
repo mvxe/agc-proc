@@ -292,10 +292,11 @@ void _gnuplot_set(int stage, int mode)
 }
 
 double minnum=100;
-double _integrate(unsigned *time_array, int mode, double dbkgnd, int subr)
+template <class inttype>
+double _integrate(inttype *time_array, int mode, double dbkgnd, int subr)
 {
-	long int result=0;
-	long int bkgnd=0;
+	long long int result=0;
+	long long int bkgnd=0;
 
 	if (mode==1 || mode==2){
 		for (unsigned i=0;i!=time_len/4;i++)          bkgnd+=time_array[i];
@@ -406,7 +407,7 @@ plotgt:	_gnuplot_set(1,mode);
 	for (unsigned i=0;i!=alpha_Nch;i++){
 		for (unsigned j=0;j!=gamma_Nch;j++){
 			fread (time_array,sizeof(unsigned),time_len,Ftime);
-			sum = _integrate(time_array, mode, (double)bkgnd_tot/alpha_tot*alpha_array_sh[i]/gamma_tot*gamma_array_sh[j],0);
+			sum = _integrate<unsigned>(time_array, mode, (double)bkgnd_tot/alpha_tot*alpha_array_sh[i]/gamma_tot*gamma_array_sh[j],0);
 			if (sum<0) sum=0;
 			if (j<=gamma_Nch-1 && i<=alpha_Nch-1) fprintf(Fgplot,"%lf %lf %lf\n",(double)i+0.5,(double)j+0.5,sum);
 		}
@@ -467,7 +468,7 @@ plotgt:	_gnuplot_set(1,mode);
 			goto plotgt;
 		}
 	}
-	{
+	else {
 		unsigned *exptime_array = new unsigned[time_len];
 		printf ( "\n\nSet areas by providing boundaries. Use format: amin amax gmin gmax and hit enter. To end hit enter again.\n");
 		for (int i=1;;i++){
@@ -493,49 +494,45 @@ plotgt:	_gnuplot_set(1,mode);
 			for (int j=0;j<amax-amin+1;j++) expalpha_array[j]=0;
 			double *expgamma_array = new double[(int)(gmax-gmin+2)];
 			for (int j=0;j<gmax-gmin+1;j++) expgamma_array[j]=0;
-			double sum;
 			
-			double *expalpha_array_bk;
-			double *expgamma_array_bk;
-			if (mode==2 || mode==4){
-				expalpha_array_bk = new double[(int)(amax-amin+2)];
-				for (int j=0;j!=amax-amin+1;j++) expalpha_array_bk[j]=0;
-				expgamma_array_bk = new double[(int)(gmax-gmin+2)];
-				for (int j=0;j!=gmax-gmin+1;j++) expgamma_array_bk[j]=0;
-			}
+			long unsigned *expalpha_array_time;
+			expalpha_array_time = new long unsigned[time_len];
+			
+			long unsigned **expgamma_array_time;
+			expgamma_array_time = new long unsigned *[(int)(gmax-gmin+2)];
+			for (int j=0;j<gmax-gmin+1;j++){
+				expgamma_array_time[j] = new long unsigned[time_len];
+				for (int k=0;k!=time_len;k++) expgamma_array_time[j][k]=0;
+			} 
+			
+			long unsigned sum;
 			
 			fseek (Ftime, 0,SEEK_SET);
 			long long unsigned total=0;
 			for (unsigned i=0;i!=time_len;i++) exptime_array[i]=0;
+
 			for (unsigned i=0;i!=alpha_Nch;i++){
+				sum=0;
+				for (int j=0;j!=time_len;j++) expalpha_array_time[j]=0;
 				for (unsigned j=0;j!=gamma_Nch;j++){
 					fread (time_array,sizeof(unsigned),time_len,Ftime);
 					if ((i>=amin)&&(i<=amax)&&(j>=gmin)&&(j<=gmax)){
 						for (unsigned k=0;k!=time_len;k++) {
 							exptime_array[k]+=time_array[k];
 							total+=time_array[k];
-						}
-							
-						if (mode==2 || mode==4){
-							sum = _integrate(time_array, mode, (double)bkgnd_tot/alpha_tot*alpha_array_sh[i]/gamma_tot*gamma_array_sh[j],1);
-							expalpha_array[i-(int)amin]+=sum;
-							expgamma_array[j-(int)gmin]+=sum;
-							sum = _integrate(time_array, mode, (double)bkgnd_tot/alpha_tot*alpha_array_sh[i]/gamma_tot*gamma_array_sh[j],2);
-							expalpha_array_bk[i-(int)amin]+=sum;
-							expgamma_array_bk[j-(int)gmin]+=sum;
-						}
-						else {
-							sum = _integrate(time_array, mode, (double)bkgnd_tot/alpha_tot*alpha_array_sh[i]/gamma_tot*gamma_array_sh[j],0);
-							expalpha_array[i-(int)amin]+=sum;
-							expgamma_array[j-(int)gmin]+=sum;
+							expalpha_array_time[k]+=time_array[k];
+							expgamma_array_time[j-(int)gmin][k]+=time_array[k];
 						}
 					}
-						
+					sum+=gamma_array_sh[j];
 				}
+				if ((i>=amin)&&(i<=amax)) expalpha_array[i-(int)amin]=_integrate<long unsigned>(expalpha_array_time, mode, (double)bkgnd_tot/alpha_tot*alpha_array_sh[i]/gamma_tot*sum,0); 
 			}
-			if (mode==2 || mode==4){
-				for (int j=0;j!=amax-amin+1;j++) expalpha_array[j]=(expalpha_array[j]-expalpha_array_bk[j])/expalpha_array_bk[j];
-				for (int j=0;j!=gmax-gmin+1;j++) expgamma_array[j]=(expgamma_array[j]-expgamma_array_bk[j])/expgamma_array_bk[j];
+
+			for (unsigned j=0;j!=gamma_Nch;j++){
+				sum=0;
+				for (unsigned i=0;i!=alpha_Nch;i++) sum+=alpha_array_sh[i];
+				if ((j>=gmin)&&(j<=gmax)) expgamma_array[j-(int)gmin]=_integrate<long unsigned>(expgamma_array_time[j-(int)gmin], mode, (double)bkgnd_tot/alpha_tot*sum/gamma_tot*gamma_array_sh[j],0);
 			}
 			FILE *Ftimesum;
 			string fname="time_area"+to_string(i)+".dat";
@@ -544,20 +541,23 @@ plotgt:	_gnuplot_set(1,mode);
 			fclose(Ftimesum);
 			printf ( "Total number of counts in area: %llu\n",total);
 			printf ( "Time graph exported to file %s\n",fname.c_str());
-			
+
 			fname="alpha_area"+to_string(i)+".txt";
 			Ftimesum = fopen(fname.c_str(),"w");
 			for (int j=1;j<amax-amin+1;j++) fprintf(Ftimesum,"%lf %lf\n",(amin+j)*step_alpha,expalpha_array[j]);
 			fclose(Ftimesum);
 			printf ( "Alpha graph exported to file %s\n Format is: Channel CountN\n",fname.c_str());
 			delete[] expalpha_array;
-			
+			delete[] expalpha_array_time;
+
 			fname="gamma_area"+to_string(i)+".txt";
 			Ftimesum = fopen(fname.c_str(),"w");
 			for (int j=1;j<gmax-gmin+1;j++) fprintf(Ftimesum,"%lf %lf\n",(gmin+j)*step_gamma,expgamma_array[j]);
 			fclose(Ftimesum);
 			printf ( "Gamma graph exported to file %s\n Format is: Channel CountN\n",fname.c_str());
 			delete[] expgamma_array;
+			for (int j=0;j<gmax-gmin+1;j++) delete[] expgamma_array_time[j];
+			delete[] expgamma_array_time;
 		}
 	}
 		
