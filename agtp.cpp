@@ -42,7 +42,8 @@ void _help()
 	        "        1 - integration on time resolved minus background\n"
 	        "        2 - peak - background ratio\n"
 	        "        3 - integration on time resolved minus background (background calculated using total num of events)\n"
-	        "        4 - peak - background ratio (background calculated using total num of events)\n");
+	        "        4 - peak - background ratio (background calculated using total num of events)\n"
+	        "negative modes (-1 to -4) are equivalent to (1 to 4) just on white background\n");
 }
 
 double xmax,xmin,ymax,ymin,xstep,ystep;
@@ -153,9 +154,11 @@ void _load_conf(string fpath)
 }
 
 FILE *Fgplot;
+bool iswhite=false;	//when we need white bg imgs for publication
 void _gnuplot_set(int stage, int mode)
 {
 	double amax;
+	string com;
 	if(mode>2) mode-=2;
 	int N=0;
 	switch (stage){
@@ -229,67 +232,127 @@ void _gnuplot_set(int stage, int mode)
 						5.5*amax*pow(10,N),ystep,amax*pow(10,N),2*amax*pow(10,N),3*amax*pow(10,N),4*amax*pow(10,N),5*amax*pow(10,N),
 						amax*pow(10,N),2*amax*pow(10,N),3*amax*pow(10,N),4*amax*pow(10,N),5*amax*pow(10,N));
 	    	break;
-	case -2: fprintf ( Fgplot,	"unset label\n"
-					"set size 1,1\n"
-					"set bmargin screen 0.01\n"
-					"set lmargin screen 0.26\n"
-					"set rmargin screen 0.99\n"
-					"set tmargin screen 0.74\n"
-					"set origin 0,0\n"
-					"unset x2label\n"
-					"unset x2tics\n"
-					"set xrange [%lf:%lf]\n"
-					"set yrange [%lf:%lf]\n"
-					"set cbrange [%c:*]\n"
-					//"set logscale cb\n"
-					"unset xlabel\n"
-					"unset ylabel\n"
-					"unset zlabel\n"
-					"set xtics out\n"
-					"set ytics out\n"
-					"set xtics scale 0.3\n"
-					"set ytics scale 0.3\n"
-					"unset ztics\n"
-					"set xtics format \" \"\n"
-					"set ytics format \" \"\n"
-					"set xtics %d\n"
-					"set ytics %d\n"
-					"set ytics nomirror\n"
-					"set pm3d map\n"
-					"unset colorbox\n"
-	    				"unset dgrid3d\n"
-	    				"unset style fill\n"
-	    				"set style rectangle back fill border lc rgb \"black\"\n"
-					"set object rectangle from screen 0.26,screen 0.01 to screen 0.99,screen 0.74 fill transparent solid 1 fc rgb \"black\" behind\n"
-					"set object rect from screen 0.26,screen 0 to screen 1,screen 0.01 fc rgb \"white\" fs solid 1 noborder\n"
-					,xmin,xmax,ymin,ymax,(mode==2)?'*':'0',(int)(xstep/step_alpha),(int)(ystep/step_gamma));    
+	case -2:if (iswhite){
+			fprintf ( Fgplot,	"unset label\n"
+						"set size 1,1\n"
+						"set bmargin screen 0.01\n"
+						"set lmargin screen 0.26\n"
+						"set rmargin screen 0.99\n"
+						"set tmargin screen 0.74\n"
+						"set origin 0,0\n"
+						"unset x2label\n"
+						"unset x2tics\n"
+						"set xrange [%lf:%lf]\n"
+						"set yrange [%lf:%lf]\n"
+						"set cbrange [%c:*]\n"
+						//"set logscale cb\n"
+						"unset xlabel\n"
+						"unset ylabel\n"
+						"unset zlabel\n"
+						"set xtics out\n"
+						"set ytics out\n"
+						"set xtics scale 0.3\n"
+						"set ytics scale 0.3\n"
+						"unset ztics\n"
+						"set xtics format \" \"\n"
+						"set ytics format \" \"\n"
+						"set xtics %d\n"
+						"set ytics %d\n"
+						"set pm3d map\n"
+						"set border front\n"
+						"unset colorbox\n"
+		    				"unset dgrid3d\n"
+		    				"unset style fill\n"
+		    				"set style rectangle back fill border lc rgb \"white\"\n"
+						,xmin,xmax,ymin,ymax,(mode==2)?'*':'0',(int)(xstep/step_alpha),(int)(ystep/step_gamma));    
+		    	if (mode==0 || mode==1) 
+		    		fprintf ( Fgplot,"set palette maxcolors 100\n"
+					"set palette defined (0 \"#f7f7f7\", 20 \"#ff5100\", 99 \"black\")\n");
+			else if (mode==2)
+				fprintf ( Fgplot,"set palette maxcolors 100\n"
+					"set palette defined (0 \"black\", 99 \"#b5fff5\")\n");
+		}else{
+			fprintf ( Fgplot,	"unset label\n"
+						"set size 1,1\n"
+						"set bmargin screen 0.01\n"
+						"set lmargin screen 0.26\n"
+						"set rmargin screen 0.99\n"
+						"set tmargin screen 0.74\n"
+						"set origin 0,0\n"
+						"unset x2label\n"
+						"unset x2tics\n"
+						"set xrange [%lf:%lf]\n"
+						"set yrange [%lf:%lf]\n"
+						"set cbrange [%c:*]\n"
+						//"set logscale cb\n"
+						"unset xlabel\n"
+						"unset ylabel\n"
+						"unset zlabel\n"
+						"set xtics out\n"
+						"set ytics out\n"
+						"set xtics scale 0.3\n"
+						"set ytics scale 0.3\n"
+						"unset ztics\n"
+						"set xtics format \" \"\n"
+						"set ytics format \" \"\n"
+						"set xtics %d\n"
+						"set ytics %d\n"
+						"set ytics nomirror\n"
+						"set pm3d map\n"
+						"unset colorbox\n"
+		    				"unset dgrid3d\n"
+		    				"unset style fill\n"
+		    				"set style rectangle back fill border lc rgb \"black\"\n"
+						"set object rectangle from screen 0.26,screen 0.01 to screen 0.99,screen 0.74 fill transparent solid 1 fc rgb \"black\" behind\n"
+						"set object rect from screen 0.26,screen 0 to screen 1,screen 0.01 fc rgb \"white\" fs solid 1 noborder\n"
+						,xmin,xmax,ymin,ymax,(mode==2)?'*':'0',(int)(xstep/step_alpha),(int)(ystep/step_gamma));    
 	    		if (mode==0 || mode==1) 
 	    			fprintf ( Fgplot,"A=1.7\n"
 					"set palette model XYZ functions gray**(A*0.35), gray**(A*0.5), gray**(A*0.8)\n");
 			else if (mode==2)
 				fprintf ( Fgplot,"set palette maxcolors 100\n"
 					"set palette defined (0 \"blue\", 99 \"yellow\")\n");
+		}
 	    	break;
-	case -1:string com;
-		if (mode==0) com="tot";
-		else if (mode==1) com="cor";
-		else if (mode==2) com="rel";
-		fprintf ( Fgplot,	"unset xtics\n"
-					"unset ytics\n"
-					"unset border\n"
-					"set colorbox user\n"
-					"set style line 3432 lc \"white\"\n"
-					"set colorbox border 3432\n"
-					"set border ls 3432\n"
-					"set colorbox vertical\n"
-					"set colorbox size 0.05,0.20\n"
-					"set colorbox origin 0.36,0.50\n"
-					"set label \"%s. counts per \\n%dx%d channels\"  textcolor \"white\" at screen 0.285,screen 0.47 rotate front\n"
-					"set label \"alpha channel\"  textcolor \"white\" at screen 0.6,screen 0.74-0.02 front\n"
-					"set label \"gamma channel\"  textcolor \"white\" at screen 0.26+0.02,screen 0.1 rotate front\n"
-					"replot\n",com.c_str(),step_alpha,step_gamma);
-	    				break;
+	case -1:if (iswhite){
+			if (mode==0) com="tot";
+			else if (mode==1) com="cor";
+			else if (mode==2) com="rel";
+			fprintf ( Fgplot,	"unset xtics\n"
+						"unset ytics\n"
+						"unset border\n"
+						"set colorbox user\n"
+						"set style line 3432 lc \"black\"\n"
+						"set colorbox border 3432\n"
+						"set colorbox vertical\n"
+						"set colorbox size 0.05,0.20\n"
+						"set colorbox origin 0.36,0.50\n"
+						"set label \"%s. counts per \\n%dx%d channels\"  textcolor \"black\" at screen 0.285,screen 0.47 rotate front\n"
+						"set label \"alpha channel\"  textcolor \"black\" at screen 0.6,screen 0.74-0.02 front\n"
+						"set label \"gamma channel\"  textcolor \"black\" at screen 0.26+0.02,screen 0.1 rotate front\n"
+						"replot\n",com.c_str(),step_alpha,step_gamma);
+		}else{
+			if (mode==0) com="tot";
+			else if (mode==1) com="cor";
+			else if (mode==2) com="rel";
+			fprintf ( Fgplot,	"unset xtics\n"
+						"unset ytics\n"
+						"unset border\n"
+						"set colorbox user\n"
+						"set style line 3432 lc \"white\"\n"
+						"set colorbox border 3432\n"
+						"set border ls 3432\n"
+						"set colorbox vertical\n"
+						"set colorbox size 0.05,0.20\n"
+						"set colorbox origin 0.36,0.50\n"
+						"set label \"%s. counts per \\n%dx%d channels\"  textcolor \"white\" at screen 0.285,screen 0.47 rotate front\n"
+						"set label \"alpha channel\"  textcolor \"white\" at screen 0.6,screen 0.74-0.02 front\n"
+						"set label \"gamma channel\"  textcolor \"white\" at screen 0.26+0.02,screen 0.1 rotate front\n"
+						"replot\n",com.c_str(),step_alpha,step_gamma);
+		}
+	    	break;
     	}
+    	
 	fflush(Fgplot);
 }
 
@@ -334,6 +397,10 @@ int main(int argc,char *argv[])
 {
 	if (argc!=3){_help();return 0;}
 	int mode = atoi(argv[2]);
+	if (mode<0) {
+		mode=-mode;
+		iswhite=true;
+	}
 	if ((mode<0)||(mode>4)){_help();return 0;}
 	string fpath = argv[1];
 	if (fpath.back()=='/') fpath.resize(fpath.size()-1);
@@ -453,7 +520,14 @@ plotgt:	_gnuplot_set(1,mode);
 		goto plotgt;
 	}
 	
-	
+	fprintf ( Fgplot,	"unset label\n"
+				"unset x2label\n"
+				"unset x2tics\n"
+				"unset xtics\n"
+				"unset ytics\n"
+				"unset xlabel\n"
+				"unset ylabel\n"
+				"unset zlabel\n");
 	
 	if (mode==2 || mode==4){
 		if (!done2) {
@@ -478,17 +552,21 @@ plotgt:	_gnuplot_set(1,mode);
 			printf ( "Area%d:\n",i);
 			fgets (newvalstr , 100 , stdin);
 			if (sscanf(newvalstr,"%lf%lf%lf%lf",&amin,&amax,&gmin,&gmax)!=4) break;
-			fprintf ( Fgplot,	"set label \"Area%d\" at %lf,%lf textcolor \"white\" front\n"
-						"set arrow from %lf,%lf to %lf,%lf nohead dt 3 lc \"white\" front\n"
-						"set arrow from %lf,%lf to %lf,%lf nohead dt 3 lc \"white\" front\n"
-						"set arrow from %lf,%lf to %lf,%lf nohead dt 3 lc \"white\" front\n"
-						"set arrow from %lf,%lf to %lf,%lf nohead dt 3 lc \"white\" front\n"
-						"replot\n"
-						,i,amax+(xmax-xmin)/100,gmax-(ymax-ymin)/40,
-						amin,gmin,amax,gmin,
-						amax,gmin,amax,gmax,
-						amax,gmax,amin,gmax,
-						amin,gmax,amin,gmin);
+			string colorstr="white";
+			if (iswhite) colorstr="black";
+			fprintf ( Fgplot,	"unset label\n"
+						"unset arrow\n"
+						"set label \"Area%d\" at %lf,%lf textcolor \"%s\" front\n"
+						"set arrow from %lf,%lf to %lf,%lf nohead dt 3 lc \"%s\" front\n"
+						"set arrow from %lf,%lf to %lf,%lf nohead dt 3 lc \"%s\" front\n"
+						"set arrow from %lf,%lf to %lf,%lf nohead dt 3 lc \"%s\" front\n"
+						"set arrow from %lf,%lf to %lf,%lf nohead dt 3 lc \"%s\" front\n"
+						"plot NaN notitle\n"
+						,i,amax+(xmax-xmin)/100,gmax-(ymax-ymin)/40,colorstr.c_str(),
+						amin,gmin,amax,gmin,colorstr.c_str(),
+						amax,gmin,amax,gmax,colorstr.c_str(),
+						amax,gmax,amin,gmax,colorstr.c_str(),
+						amin,gmax,amin,gmin,colorstr.c_str());
 			fflush(Fgplot);	
 			
 			double *expalpha_array = new double[(int)(amax-amin+2)];
